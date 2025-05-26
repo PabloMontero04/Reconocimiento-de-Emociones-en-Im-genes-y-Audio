@@ -1,6 +1,10 @@
 streamlit
-tensorflow
-opencv-python
-huggingface_hub
-numpy
 Pillow
+deepface
+torch
+torchaudio
+transformers
+scipy
+numpy
+librosa
+soundfile

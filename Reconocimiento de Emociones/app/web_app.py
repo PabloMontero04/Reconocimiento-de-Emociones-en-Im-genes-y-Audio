@@ -69,13 +69,7 @@ with tab_img:
             for lab, p in probs.items():
                 st.progress(float(p) / 100.0, text=f"{lab.capitalize()}: {float(p):.2f}%")
 
-        if st.button("🔄 Subir otra imagen", key="reset_img"):
-            try:
-                os.remove(temp_img)
-            except FileNotFoundError:
-                pass
-            st.session_state.last_img_hash = None
-            st.rerun()
+       
 
 # ========== TAB AUDIO ==========
 with tab_audio:
@@ -112,10 +106,4 @@ with tab_audio:
             for lab, p in probs_a.items():
                 st.progress(float(p) / 100.0, text=f"{lab.capitalize()}: {float(p):.2f}%")
 
-        if st.button("🔄 Subir otro audio", key="reset_audio"):
-            try:
-                os.remove(temp_audio)
-            except FileNotFoundError:
-                pass
-            st.session_state.last_audio_hash = None
-            st.rerun()
+        
