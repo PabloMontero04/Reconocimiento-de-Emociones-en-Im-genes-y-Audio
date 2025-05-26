@@ -2,79 +2,108 @@ import streamlit as st
 import os
 import sys
 import time
-from PIL import Image
 import hashlib
+from PIL import Image
 
-# Añadir ruta del directorio raíz
+# ───────────────────── Rutas del proyecto ─────────────────────
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PARENT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, '..'))
+PARENT_DIR  = os.path.abspath(os.path.join(CURRENT_DIR, '..'))
 if PARENT_DIR not in sys.path:
     sys.path.append(PARENT_DIR)
 
-from src.detect_emotion_image import predict_emotion_image
+from src.detect_emotion_image  import predict_emotion_image
+from src.predict_emotion_audio import predict_emotion_audio
 
-# Configuración de la página
+# ───────────────────── Configuración Streamlit ─────────────────────
 st.set_page_config(page_title="Detector de Emociones", layout="centered")
-st.title("😄 Reconocimiento de Emociones Faciales")
-st.markdown("Sube una imagen con un rostro visible para detectar la emoción expresada.")
+st.title("🧠 Detector de Emociones en Imagen y Audio")
 
-# Crear carpeta de imágenes
-UPLOAD_FOLDER = "uploaded_images"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-temp_path = "temp.jpg"
+# Carpetas de subida
+IMG_FOLDER   = "uploaded_images"
+AUDIO_FOLDER = "uploaded_audio"
+os.makedirs(IMG_FOLDER, exist_ok=True)
+os.makedirs(AUDIO_FOLDER, exist_ok=True)
 
-# Para evitar problemas de caché, usamos un hash
-def get_file_hash(file_bytes):
-    return hashlib.md5(file_bytes).hexdigest()
+# Utilidad para hash MD5
+def md5(b): return hashlib.md5(b).hexdigest()
 
-# Estado de sesión
-if 'last_image_hash' not in st.session_state:
-    st.session_state.last_image_hash = None
+# Estado inicial de sesión
+st.session_state.setdefault("last_img_hash", None)
+st.session_state.setdefault("last_audio_hash", None)
 
-# Subida de imagen
-uploaded_file = st.file_uploader("📷 Sube una imagen (JPG o PNG)", type=["jpg", "jpeg", "png"])
+# ───────────────────── Interfaz con pestañas ─────────────────────
+tab_img, tab_audio = st.tabs(["🖼 Imagen", "🎙 Audio"])
 
-if uploaded_file:
-    file_bytes = uploaded_file.read()
-    current_hash = get_file_hash(file_bytes)
+# ========== TAB IMAGEN ==========
+with tab_img:
+    st.markdown("### Sube una imagen con rostro para detectar la emoción.")
+    img_file = st.file_uploader("📷 Imagen (JPG / PNG)", type=["jpg", "jpeg", "png"], key="img_uploader")
+    temp_img = "temp.jpg"
 
-    if st.session_state.last_image_hash != current_hash:
-        st.session_state.last_image_hash = current_hash
+    if img_file:
+        img_bytes = img_file.read()
+        img_hash = md5(img_bytes)
 
-        timestamp = int(time.time())
-        file_ext = os.path.splitext(uploaded_file.name)[1]
-        saved_image_path = os.path.join(UPLOAD_FOLDER, f"imagen_{timestamp}{file_ext}")
+        if st.session_state.last_img_hash != img_hash:
+            st.session_state.last_img_hash = img_hash
 
-        # Guardar la imagen
-        with open(saved_image_path, "wb") as f:
-            f.write(file_bytes)
-        with open(temp_path, "wb") as f:
-            f.write(file_bytes)
+            ts = int(time.time())
+            ext = os.path.splitext(img_file.name)[1]
+            saved_path = os.path.join(IMG_FOLDER, f"img_{ts}{ext}")
 
-        st.rerun()
+            with open(saved_path, "wb") as f: f.write(img_bytes)
+            with open(temp_img, "wb") as f: f.write(img_bytes)
 
-# Procesar si hay una imagen temporal
-if os.path.exists(temp_path):
-    st.image(Image.open(temp_path), caption="Imagen subida", use_container_width=True)
+            st.rerun()
 
-    with st.spinner("Detectando emoción..."):
-        emotion, processed_img, probs = predict_emotion_image(temp_path)
+    if os.path.exists(temp_img):
+        st.image(Image.open(temp_img), caption="Imagen subida", use_container_width=True)
 
-    st.success(f"🎯 Emoción detectada: **{emotion.upper()}**")
+        with st.spinner("Detectando emoción..."):
+            emo, _, probs = predict_emotion_image(temp_img)
 
-    # Mostrar imagen procesada
-    if processed_img is not None:
-        import matplotlib.pyplot as plt
-        st.markdown("### 🧠 Imagen procesada")
-        fig, ax = plt.subplots()
-        ax.imshow(processed_img)
-        ax.axis("off")
-        st.pyplot(fig)
+        st.success(f"🎯 Emoción detectada: **{emo.upper()}**")
 
-    # Mostrar barras de probabilidad
-    if probs is not None:
-        st.markdown("### 📊 Probabilidades por emoción")
-        for label, prob in probs.items():
-            st.progress(float(prob) / 100.0, text=f"{label.capitalize()}: {float(prob):.2f}%")
+        if probs:
+            st.markdown("#### 📊 Probabilidades")
+            for lab, p in probs.items():
+                st.progress(float(p) / 100.0, text=f"{lab.capitalize()}: {float(p):.2f}%")
 
+       
 
+# ========== TAB AUDIO ==========
+with tab_audio:
+    st.markdown("### Sube un archivo de audio (WAV/MP3/FLAC) para detectar la emoción.")
+    audio_file = st.file_uploader("🔊 Audio", type=["wav", "mp3", "flac"], key="audio_uploader")
+    temp_audio = "temp_audio.wav"
+
+    if audio_file:
+        audio_bytes = audio_file.read()
+        audio_hash = md5(audio_bytes)
+
+        if st.session_state.last_audio_hash != audio_hash:
+            st.session_state.last_audio_hash = audio_hash
+
+            ts = int(time.time())
+            ext = os.path.splitext(audio_file.name)[1]
+            saved_path = os.path.join(AUDIO_FOLDER, f"aud_{ts}{ext}")
+
+            with open(saved_path, "wb") as f: f.write(audio_bytes)
+            with open(temp_audio, "wb") as f: f.write(audio_bytes)
+
+            st.rerun()
+
+    if os.path.exists(temp_audio):
+        st.audio(open(temp_audio, "rb").read(), format="audio/wav")
+
+        with st.spinner("Analizando emoción..."):
+            emo_a, probs_a = predict_emotion_audio(temp_audio)
+
+        st.success(f"🎯 Emoción detectada: **{emo_a.upper()}**")
+
+        if probs_a:
+            st.markdown("#### 📊 Probabilidades")
+            for lab, p in probs_a.items():
+                st.progress(float(p) / 100.0, text=f"{lab.capitalize()}: {float(p):.2f}%")
+
+        
